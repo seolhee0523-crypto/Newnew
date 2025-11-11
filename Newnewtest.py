@@ -1,64 +1,63 @@
-import 'dart:io';
-import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:firebase_storage/firebase_storage.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+# personal_color_recommender.py
 
-// ------------------------------------------
-// 1. 사진 선택/촬영 및 업로드 처리 함수
-// ------------------------------------------
-Future<void> uploadAndVerifyCleanup(String studentName) async {
-  final picker = ImagePicker();
-  // 사용자가 사진을 선택/촬영
-  final XFile? pickedFile = await picker.pickImage(source: ImageSource.camera); // 카메라 사용 예시
-
-  if (pickedFile != null) {
-    File imageFile = File(pickedFile.path);
-
-    try {
-      // 1. Firebase Storage에 이미지 업로드
-      // 파일 이름: 'cleanup_photos/YYYYMMDD_HHmmss_StudentName.jpg' 형식
-      String fileName = 'cleanup_photos/${DateTime.now().millisecondsSinceEpoch}_$studentName.jpg';
-      Reference storageRef = FirebaseStorage.instance.ref().child(fileName);
-
-      // 파일 업로드 실행
-      UploadTask uploadTask = storageRef.putFile(imageFile);
-      TaskSnapshot snapshot = await uploadTask;
-
-      // 업로드된 이미지의 다운로드 URL 획득
-      String downloadURL = await snapshot.ref.getDownloadURL();
-
-      // 2. Firebase Firestore에 인증 정보 저장
-      await FirebaseFirestore.instance.collection('cleanup_verifications').add({
-        'student_name': studentName,
-        'image_url': downloadURL,
-        'timestamp': FieldValue.serverTimestamp(), // 서버 시간으로 저장
-        'is_verified': false, // 선생님이 나중에 확인할 수 있는 필드
-      });
-
-      print("청소 인증 성공: $downloadURL");
-      // TODO: 사용자에게 성공 메시지 표시 (예: ScaffoldMessenger)
-
-    } catch (e) {
-      print("청소 인증 중 오류 발생: $e");
-      // TODO: 사용자에게 오류 메시지 표시
-    }
-  } else {
-    print('사진 선택이 취소되었습니다.');
-  }
+# 1. 퍼스널 컬러별 추천 화장품 데이터 정의
+# ----------------------------------------------------------------------
+RECOMMENDATION_DATA = {
+    "봄 웜": {
+        "립": ["코랄 핑크 립스틱 (A사)", "피치 틴트 (B사)", "오렌지 레드 글로스 (C사)"],
+        "아이섀도": ["피치/살구 계열 팔레트 (D사)", "골드 펄 아이섀도 (E사)"],
+        "블러셔": ["살구색 블러셔 (F사)", "코랄 크림 블러셔 (G사)"],
+    },
+    "여름 쿨": {
+        "립": ["로즈 핑크 틴트 (H사)", "쿨톤 레드 립스틱 (I사)", "라벤더 립 밤 (J사)"],
+        "아이섀도": ["쿨 브라운/그레이시 핑크 팔레트 (K사)", "실버 펄 아이섀도 (L사)"],
+        "블러셔": ["연보라색 블러셔 (M사)", "딸기우유 핑크 블러셔 (N사)"],
+    },
+    "가을 웜": {
+        "립": ["브릭 레드 매트 립스틱 (O사)", "MLBB 로즈 틴트 (P사)", "누드톤 베이지 립 (Q사)"],
+        "아이섀도": ["브라운/카키 계열 음영 팔레트 (R사)", "골드/브론즈 쉬머 섀도 (S사)"],
+        "블러셔": ["말린 장미색 블러셔 (T사)", "테라코타 블러셔 (U사)"],
+    },
+    "겨울 쿨": {
+        "립": ["버건디/와인 레드 립스틱 (V사)", "마젠타 핑크 틴트 (W사)", "선명한 체리 레드 립 (X사)"],
+        "아이섀도": ["차콜/블랙/모노톤 팔레트 (Y사)", "다크 그레이 쉬머 섀도 (Z사)"],
+        "블러셔": ["플럼색 블러셔 (A1사)", "쨍한 핫핑크 블러셔 (B1사)"],
+    },
 }
 
-// ------------------------------------------
-// 2. 사용 예시 (Flutter 위젯)
-// ------------------------------------------
-class CleanupVerificationButton extends StatelessWidget {
-  final String currentStudentName = '김철수'; // 실제 앱에서는 로그인된 사용자 이름 사용
+# 2. 사용자 입력 및 추천 로직 함수
+# ----------------------------------------------------------------------
+def recommend_cosmetics(personal_color: str):
+    """
+    퍼스널 컬러에 따라 화장품을 추천하고 출력합니다.
+    """
+    # 입력된 색상을 데이터의 키 형태로 표준화합니다.
+    color_key = personal_color.strip().replace(" ", "").upper()
+    
+    # 추천 데이터의 키 목록을 확인하여 사용자에게 보여줄 이름과 매칭
+    available_colors = {k.replace(" ", "").upper(): k for k in RECOMMENDATION_DATA.keys()}
 
-  @override
-  Widget build(BuildContext context) {
-    return ElevatedButton(
-      onPressed: () => uploadAndVerifyCleanup(currentStudentName),
-      child: const Text('🧹 청소 인증샷 올리기'),
-    );
-  }
-}
+    if color_key in available_colors:
+        # 정확한 데이터 키를 가져옵니다.
+        actual_key = available_colors[color_key]
+        recommendations = RECOMMENDATION_DATA[actual_key]
+
+        print(f"\n🎉 **'{actual_key}'** 타입이시군요! 추천 화장품 목록입니다. 🎉")
+        print("-" * 40)
+        
+        # 카테고리별로 추천 목록을 출력합니다.
+        for category, items in recommendations.items():
+            print(f"**{category} 추천**: ")
+            for item in items:
+                print(f"  - {item}")
+        print("-" * 40)
+        
+    else:
+        print("\n⚠️ 유효하지 않은 퍼스널 컬러입니다.")
+        print(f"**[선택 가능한 컬러]**: {', '.join(RECOMMENDATION_DATA.keys())}")
+
+
+# 3. 메인 실행 함수
+# ----------------------------------------------------------------------
+def main():
+    print("--- 🎨 퍼스널 컬러 화장품 추천
